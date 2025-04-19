@@ -38,35 +38,77 @@ class TaskExecutor:
 
         try:
             # Use the intents defined in nlu_processor.py
-            if intent == 'schedule_event':
+            if intent == 'schedule_meeting':
                 # Placeholder: Call Google Calendar API
                 # result = self.google_calendar.schedule_event(entities)
-                result = f"[Placeholder] Scheduling event with details: {entities}"
+                person = entities.get('person', ['Someone'])[0] # Take first person if list
+                datetime_str = entities.get('datetime', 'an unspecified time')
+                result = f"[Placeholder] Scheduling meeting with {person} for {datetime_str}. Details: {entities}"
                 logging.info(f"Task '{intent}' triggered.")
-            elif intent == 'send_message':
-                # Placeholder: Call Slack/Email API
-                # result = self.slack.send_message(entities.get('channel'), entities.get('message'))
-                result = f"[Placeholder] Sending message with details: {entities}"
+            elif intent == 'send_email':
+                # Placeholder: Call Email API
+                recipient = entities.get('email_address', entities.get('person', ['Someone'])[0])
+                subject = entities.get('subject', 'Quick Question') # Need NLU to extract subject
+                body = entities.get('body', '...') # Need NLU to extract body
+                result = f"[Placeholder] Sending email to {recipient} with subject '{subject}'. Details: {entities}"
                 logging.info(f"Task '{intent}' triggered.")
-            # Example for a potential future 'open_application' intent
-            # elif intent == 'open_application':
-            #     # Placeholder: Run local command (use with caution!)
-            #     app_name = entities.get('app_name')
-            #     if app_name:
-            #         # Be very careful with subprocess on Windows
-            #         # Example: os.startfile(f"C:\Path\To\{app_name}.exe")
-            #         result = f"[Placeholder] Opening application: {app_name}"
-            #         logging.info(f"Task 'open_application' for {app_name} triggered.")
-            #     else:
-            #         result = "Error: Application name not specified."
-            #         logging.warning("Task 'open_application' failed: no app name.")
-            # Add more intent handlers here
+            elif intent == 'send_message': # Generic message
+                # Placeholder: Call Slack/SMS/etc. API
+                recipient = entities.get('person', ['Someone'])[0]
+                message_body = entities.get('message_body', '...') # Need NLU to extract
+                result = f"[Placeholder] Sending message to {recipient}. Details: {entities}"
+                logging.info(f"Task '{intent}' triggered.")
+            elif intent == 'open_application':
+                # Placeholder: Run local command (use with caution!)
+                app_name = entities.get('object_name', [None])[0] # Take first object name if list
+                if app_name:
+                    # Actual implementation would need os.startfile or subprocess
+                    # Example: os.startfile(f"C:\Path\To\{app_name}.exe") or subprocess.run(['open', '-a', app_name]) on macOS
+                    result = f"[Placeholder] Attempting to open application: {app_name}"
+                    logging.info(f"Task 'open_application' for {app_name} triggered.")
+                else:
+                    result = "Error: Application name not specified."
+                    logging.warning("Task 'open_application' failed: no app name.")
+            elif intent == 'close_application':
+                 # Placeholder: Find process and terminate (complex and platform-specific)
+                app_name = entities.get('object_name', [None])[0]
+                if app_name:
+                    result = f"[Placeholder] Attempting to close application: {app_name}"
+                    logging.info(f"Task 'close_application' for {app_name} triggered.")
+                else:
+                    result = "Error: Application name not specified for closing."
+                    logging.warning("Task 'close_application' failed: no app name.")
+            elif intent == 'search_web':
+                # Placeholder: Open web browser with search query
+                query = entities.get('search_query', '')
+                if query:
+                    # Actual implementation would use webbrowser.open(f"https://www.google.com/search?q={query}")
+                    result = f"[Placeholder] Searching web for: '{query}'"
+                    logging.info(f"Task 'search_web' triggered with query: {query}")
+                else:
+                    result = "Error: No search query provided."
+                    logging.warning("Task 'search_web' failed: no query.")
+            elif intent == 'set_reminder':
+                # Placeholder: Integrate with reminder system/calendar
+                datetime_str = entities.get('datetime', 'later')
+                reminder_subject = entities.get('reminder_subject', 'something') # Need NLU extraction
+                result = f"[Placeholder] Setting reminder about '{reminder_subject}' for {datetime_str}. Details: {entities}"
+                logging.info(f"Task '{intent}' triggered.")
+            elif intent == 'schedule_event': # Generic event if not meeting
+                datetime_str = entities.get('datetime', 'an unspecified time')
+                event_details = entities.get('event_details', 'something') # Need NLU extraction
+                result = f"[Placeholder] Scheduling event '{event_details}' for {datetime_str}. Details: {entities}"
+                logging.info(f"Task '{intent}' triggered.")
             elif intent == 'unknown_intent':
                  result = "I'm not sure how to handle that request yet."
                  logging.info("No specific task triggered for unknown intent.")
+            elif intent == 'error': # Handle NLU errors
+                error_msg = nlu_result.get('error', 'Unknown NLU error')
+                result = f"Sorry, I encountered an error trying to understand that: {error_msg}"
+                logging.warning(f"NLU processing error passed to Task Executor: {error_msg}")
             else:
                 # Handle other potential intents or errors from NLU
-                result = f"Received intent '{intent}', but no specific action is defined."
+                result = f"Received intent '{intent}', but no specific action is defined for it yet."
                 logging.warning(f"Unhandled intent received: {intent}")
             
             return result

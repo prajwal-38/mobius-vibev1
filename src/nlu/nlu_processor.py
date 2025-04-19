@@ -58,23 +58,102 @@ class NLUProcessor:
             logging.error(f"Error during NLU processing: {e}", exc_info=True)
             return {'intent': 'error', 'entities': {}, 'error': 'NLU processing failed'}
 
-    # Basic placeholder methods for intent/entity logic
+    # --- Intent & Entity Recognition Logic ---
+
     def _recognize_intent(self, doc):
-        # TODO: Implement more sophisticated intent recognition (rules, ML model)
-        # Simple example: Check for keywords
-        if any(token.lemma_ in ["schedule", "book", "set up"] for token in doc):
-            return "schedule_event"
-        elif any(token.lemma_ in ["send", "email", "message"] for token in doc):
-            return "send_message"
-        # Add more rules or integrate a classifier
+        """Recognizes intent based on keywords and basic patterns."""
+        text_lower = doc.text.lower()
+        tokens_lemma = {token.lemma_ for token in doc}
+
+        # Order matters: more specific intents first
+        if 'meeting' in tokens_lemma and any(t in tokens_lemma for t in ["schedule", "book", "set up", "arrange"]):
+            return "schedule_meeting"
+        elif any(t in tokens_lemma for t in ["email", "mail"]) and 'send' in tokens_lemma:
+            return "send_email"
+        elif any(t in tokens_lemma for t in ["message", "note"]) and 'send' in tokens_lemma:
+            return "send_message" # Could be SMS, Slack, etc. - needs context
+        elif any(t in text_lower for t in ["open", "launch", "start"]) and ('application' in text_lower or 'app' in text_lower or any(ent.label_ == 'ORG' or ent.label_ == 'PRODUCT' for ent in doc.ents)):
+             # Check for ORG/PRODUCT entities as potential app names
+             return "open_application"
+        elif any(t in tokens_lemma for t in ["search", "find", "look up", "google"]) and ('web' in tokens_lemma or 'internet' in tokens_lemma or 'google' in tokens_lemma):
+            return "search_web"
+        elif any(t in tokens_lemma for t in ["reminder", "remind"]):
+             return "set_reminder"
+        elif any(t in tokens_lemma for t in ["close", "exit", "quit"]):
+             return "close_application" # Added close intent
+
+        # Generic scheduling/sending if specific type isn't clear
+        elif any(t in tokens_lemma for t in ["schedule", "book", "set up"]):
+            return "schedule_event" # Generic event
+        elif any(t in tokens_lemma for t in ["send"]):
+            return "send_message" # Generic send
+
+        # Fallback
         return "unknown_intent"
 
     def _extract_entities(self, doc):
-        # Extract entities using spaCy's built-in NER
+        """Extracts entities using spaCy NER and basic pattern matching."""
         entities = {}
+        # Extract standard NER entities
         for ent in doc.ents:
-            # Use lowercase label for consistency
-            entities[ent.label_.lower()] = ent.text
+            label = ent.label_.lower()
+            # Consolidate date/time
+            if label in ['date', 'time']:
+                if 'datetime' not in entities:
+                    entities['datetime'] = []
+                entities['datetime'].append(ent.text)
+            elif label == 'person':
+                 entities.setdefault('person', []).append(ent.text)
+            elif label == 'org' or label == 'product': # Potential app/company names
+                 entities.setdefault('object_name', []).append(ent.text)
+            else:
+                entities[label] = ent.text # Store other entities directly
+
+        # Combine multiple date/time entities if found
+        if 'datetime' in entities:
+            entities['datetime'] = ' '.join(entities['datetime'])
+
+        # Simple pattern for email addresses (if not caught by NER)
+        for token in doc:
+            if token.like_email:
+                entities['email_address'] = token.text
+
+        # Simple pattern for application name after 'open'/'close'
+        intent = self._recognize_intent(doc) # Re-check intent for context
+        if intent in ['open_application', 'close_application'] and 'object_name' not in entities:
+            for token in doc:
+                # Look for a noun/proper noun after 'open'/'close'/'start'/'launch'/'quit'/'exit'
+                if token.lemma_ in ['open', 'launch', 'start', 'close', 'quit', 'exit'] and token.i + 1 < len(doc):
+                    next_token = doc[token.i + 1]
+                    # Check if it's a likely app name (Noun, Proper Noun, maybe capitalized)
+                    if next_token.pos_ in ['NOUN', 'PROPN'] or next_token.is_title:
+                        entities['object_name'] = next_token.text
+                        # Potentially grab compound names like 'Visual Studio'
+                        if next_token.i + 1 < len(doc) and doc[next_token.i + 1].pos_ in ['NOUN', 'PROPN']:
+                             entities['object_name'] += ' ' + doc[next_token.i + 1].text
+                        break # Take the first likely candidate
+
+        # Extract potential search query for 'search_web'
+        if intent == 'search_web':
+            search_keywords = ['search', 'find', 'look up', 'google']
+            prepositions = ['for', 'about', 'on']
+            query_parts = []
+            start_index = -1
+            # Find the keyword that triggered the intent
+            for i, token in enumerate(doc):
+                if token.lemma_ in search_keywords:
+                    start_index = i
+                    break
+            # Extract text after the keyword and optional preposition
+            if start_index != -1:
+                current_index = start_index + 1
+                if current_index < len(doc) and doc[current_index].lemma_ in prepositions:
+                    current_index += 1 # Skip preposition
+                # Take the rest of the sentence as the query
+                query_parts = [token.text for token in doc[current_index:]]
+            if query_parts:
+                entities['search_query'] = ' '.join(query_parts).strip()
+
         return entities
 
 # Example usage (for testing):

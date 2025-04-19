@@ -61,25 +61,40 @@ class CommandLineInterface:
                 assistant_response = self.llm.generate(prompt)
                 logging.info(f"LLM Response: {assistant_response[:100]}...")
 
-                # 5. Execute Task (if applicable based on intent)
-                task_result = None
-                if intent != 'unknown' and intent != 'error' and intent != 'simulated_intent': # Adjust condition based on actual intents
-                    # Pass relevant info (entities, maybe response) to executor
+                # 5. Decide Action: Execute Task or Generate LLM Response
+                final_response = None
+                task_executed = False
+                # Check if the intent is one that should trigger a direct task execution
+                actionable_intents = [
+                    'schedule_meeting', 'send_email', 'send_message', 
+                    'open_application', 'close_application', 'search_web', 
+                    'set_reminder', 'schedule_event'
+                ]
+                if intent in actionable_intents:
                     task_result = self.executor.execute_task(nlu_result)
                     logging.info(f"Task Execution Result: {task_result}")
-                    # Optionally incorporate task_result into the final response
-                    # assistant_response += f"\n[Task Status: {task_result}]" # Example
-                elif intent == 'simulated_intent': # Handle simulated NLU result
-                    task_result = self.executor.execute_task(nlu_result)
-                    assistant_response = task_result # Use task result as response for simulation
+                    final_response = task_result # Use task result as the primary response
+                    task_executed = True
+                elif intent == 'error': # Handle NLU error explicitly
+                    final_response = nlu_result.get('error', 'An NLU processing error occurred.')
+                    task_executed = True # Technically an action (reporting error)
+                # elif intent == 'unknown_intent': # Let LLM handle unknown intents
+                #     pass # Fall through to LLM generation
+                
+                # If no specific task was executed, generate a response using LLM
+                if not task_executed:
+                    # 4. Get LLM Response (using context)
+                    final_response = self.llm.generate(prompt)
+                    logging.info(f"LLM Response: {final_response[:100]}...")
 
                 # 6. Update Memory
-                self.memory.add_short_term(user_input, assistant_response)
+                # Use the final response that was shown to the user
+                self.memory.add_short_term(user_input, final_response)
                 # Optionally save things to long-term memory based on interaction
                 # self.memory.save_long_term(...) 
 
                 # 7. Display Response
-                print(f"Assistant: {assistant_response}")
+                print(f"Assistant: {final_response}")
 
             except KeyboardInterrupt:
                 logging.info("Keyboard interrupt received. Exiting.")
