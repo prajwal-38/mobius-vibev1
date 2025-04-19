@@ -1,0 +1,35 @@
+# Project Dependencies
+# Core LLM & Acceleration
+# torch -- Find install instructions at https://pytorch.org/
+# transformers
+# accelerate
+# bitsandbytes -- for quantization if needed
+llama-cpp-python # for GGUF models, ensure CUDA support is compiled if needed
+
+# NLU
+spacy
+# sentence-transformers -- for embeddings if used
+
+# Task Management & Orchestration
+# langchain
+
+# Integrations (Examples)
+# google-api-python-client
+# google-auth-httplib2
+# google-auth-oauthlib
+# slack_sdk
+
+# Memory (Database)
+sqlalchemy # for ORM with SQLite/PostgreSQL
+# psycopg2-binary -- if using PostgreSQL
+# pymongo -- if using MongoDB
+
+# Configuration
+pyyaml
+
+# UI (Optional)
+# gradio
+# flask / fastapi -- for web UI backend
+
+# Other Utilities
+python-dotenv # for environment variables

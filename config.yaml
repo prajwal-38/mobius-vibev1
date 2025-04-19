@@ -1,0 +1,39 @@
+# Configuration for Mobius Vibe Assistant
+
+# LLM Configuration
+llm:
+  model_path: "C:/Users/pwal9/Documents/assistant/models/Mistral-7B-Instruct-v0.3.Q4_K_M.gguf" # IMPORTANT: Replace with the actual path to your GGUF model
+  n_gpu_layers: -1 # Number of layers to offload to GPU (-1 for all)
+  n_ctx: 2048 # Context window size
+  temperature: 0.7
+  max_tokens: 512
+  fp16: true # Use FP16/mixed precision
+
+# NLU Configuration
+nlu:
+  spacy_model: "en_core_web_sm" # Example spaCy model
+
+# Memory Configuration
+memory:
+  database_type: "sqlite" # Options: sqlite, postgresql, mongodb
+  database_path: "mobius_memory.db" # Path for SQLite DB
+  # postgresql_conn_string: "postgresql://user:password@host:port/database" # Uncomment if using PostgreSQL
+  # mongodb_conn_string: "mongodb://user:password@host:port/" # Uncomment if using MongoDB
+  short_term_limit: 10 # Max recent interactions to keep in short-term memory
+  long_term_pruning_days: 180 # Prune long-term memories older than this many days
+
+# API Keys & Integrations (Store sensitive keys in .env)
+api_keys:
+  google_calendar: "YOUR_GOOGLE_CALENDAR_API_KEY" # Placeholder - Use .env for real keys
+  slack_token: "YOUR_SLACK_BOT_TOKEN" # Placeholder - Use .env for real keys
+
+# UI Configuration (Optional)
+ui:
+  interface_type: "cli" # Options: cli, gradio, web
+  # web_host: "127.0.0.1"
+  # web_port: 7860
+
+# Logging
+logging:
+  level: "INFO" # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  log_file: "assistant.log"
