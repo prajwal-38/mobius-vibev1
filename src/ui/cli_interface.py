@@ -57,10 +57,6 @@ class CommandLineInterface:
                 prompt_parts.append("Assistant:") # Prompt the assistant for its turn
                 prompt = "\n".join(prompt_parts)
 
-                # 4. Get LLM Response
-                assistant_response = self.llm.generate(prompt)
-                logging.info(f"LLM Response: {assistant_response[:100]}...")
-
                 # 5. Decide Action: Execute Task or Generate LLM Response
                 final_response = None
                 task_executed = False
@@ -68,33 +64,46 @@ class CommandLineInterface:
                 actionable_intents = [
                     'schedule_meeting', 'send_email', 'send_message', 
                     'open_application', 'close_application', 'search_web', 
-                    'set_reminder', 'schedule_event'
+                    'set_reminder', 'schedule_event', 'get_current_datetime' # Added date/time intent
                 ]
+                logging.debug(f"Checking intent '{intent}' against actionable intents: {actionable_intents}")
+                
                 if intent in actionable_intents:
+                    logging.info(f"Intent '{intent}' is actionable. Executing task...")
                     task_result = self.executor.execute_task(nlu_result)
-                    logging.info(f"Task Execution Result: {task_result}")
+                    # Log confirmation/snippet instead of full result to avoid console duplication via StreamHandler
+                    logging.info(f"Task '{intent}' executed. Result length: {len(str(task_result))}") 
                     final_response = task_result # Use task result as the primary response
                     task_executed = True
                 elif intent == 'error': # Handle NLU error explicitly
                     final_response = nlu_result.get('error', 'An NLU processing error occurred.')
+                    logging.warning(f"NLU Error reported: {final_response}")
                     task_executed = True # Technically an action (reporting error)
-                # elif intent == 'unknown_intent': # Let LLM handle unknown intents
-                #     pass # Fall through to LLM generation
                 
-                # If no specific task was executed, generate a response using LLM
+                # If no specific task was executed (or intent was unknown/not actionable), generate a response using LLM
+                logging.debug(f"Task executed flag: {task_executed}. Intent was: '{intent}'.")
                 if not task_executed:
-                    # 4. Get LLM Response (using context)
-                    final_response = self.llm.generate(prompt)
-                    logging.info(f"LLM Response: {final_response[:100]}...")
+                    logging.info(f"Intent '{intent}' not actionable or task not executed. Generating LLM response.")
+                    # Generate LLM Response (streaming)
+                    print("Assistant: ", end="", flush=True)
+                    full_response = ""
+                    for token in self.llm.generate(prompt):
+                        print(token, end="", flush=True)
+                        full_response += token
+                    print() # Add a newline after the streaming is complete
+                    final_response = full_response # Store the complete response
+                    logging.info(f"LLM Response (full): {final_response[:100]}...")
+                else:
+                    # If a task was executed, print its result normally
+                    print(f"Assistant: {final_response}")
 
                 # 6. Update Memory
-                # Use the final response that was shown to the user
+                # Use the final response that was generated/executed
                 self.memory.add_short_term(user_input, final_response)
                 # Optionally save things to long-term memory based on interaction
                 # self.memory.save_long_term(...) 
 
-                # 7. Display Response
-                print(f"Assistant: {final_response}")
+                # 7. Display Response (Handled above for streaming/non-streaming cases)
 
             except KeyboardInterrupt:
                 logging.info("Keyboard interrupt received. Exiting.")
@@ -112,8 +121,14 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     print("Running CLI Interface example requires setting up dummy components.")
     # Dummy components for basic testing (replace with actual instances)
-    class DummyLLM: 
-        def generate(self, prompt): return f"Simulated LLM response to: {prompt}"
+    class DummyLLM:
+        def generate(self, prompt):
+            # Simulate streaming for the dummy
+            response = f"Simulated streaming response to: {prompt}"
+            import time
+            for char in response:
+                yield char
+                time.sleep(0.01)
     class DummyNLU: 
         def process(self, text): return {'intent': 'simulated_intent', 'entities': {'text': text}}
     class DummyMemory: 

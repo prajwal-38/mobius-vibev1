@@ -72,15 +72,29 @@ class NLUProcessor:
             return "send_email"
         elif any(t in tokens_lemma for t in ["message", "note"]) and 'send' in tokens_lemma:
             return "send_message" # Could be SMS, Slack, etc. - needs context
-        elif any(t in text_lower for t in ["open", "launch", "start"]) and ('application' in text_lower or 'app' in text_lower or any(ent.label_ == 'ORG' or ent.label_ == 'PRODUCT' for ent in doc.ents)):
-             # Check for ORG/PRODUCT entities as potential app names
-             return "open_application"
-        elif any(t in tokens_lemma for t in ["search", "find", "look up", "google"]) and ('web' in tokens_lemma or 'internet' in tokens_lemma or 'google' in tokens_lemma):
+        # Simplified intent check for opening things
+        elif any(t in tokens_lemma for t in ["open", "launch", "start"]):
+            # Check if there's a likely object following the verb
+            for token in doc:
+                if token.lemma_ in ["open", "launch", "start"] and token.i + 1 < len(doc):
+                    # Check if the next token is a noun, proper noun, or potentially an app name
+                    next_token = doc[token.i + 1]
+                    if next_token.pos_ in ['NOUN', 'PROPN', 'X'] or next_token.is_title or next_token.text.lower() in ['chrome', 'firefox', 'edge', 'notepad', 'calculator']:
+                        return "open_application"
+            # If 'open' is present but no clear object, maybe it's a generic open?
+            # Decide if you want a fallback or require an object.
+            # For now, let's require an object found above.
+        # Relaxed web search intent: trigger on search verbs if not matched elsewhere
+        elif any(t in tokens_lemma for t in ["search", "find", "look up", "google"]):
+            # Add a check here to avoid capturing things like 'find my keys' if you add a 'find_object' intent later
+            # For now, assume if it has a search verb and isn't another intent, it's a web search.
             return "search_web"
         elif any(t in tokens_lemma for t in ["reminder", "remind"]):
              return "set_reminder"
         elif any(t in tokens_lemma for t in ["close", "exit", "quit"]):
              return "close_application" # Added close intent
+        elif any(t in tokens_lemma for t in ["date", "time", "day", "today"]) and not any(t in tokens_lemma for t in ["schedule", "meeting", "reminder"]):
+             return "get_current_datetime"
 
         # Generic scheduling/sending if specific type isn't clear
         elif any(t in tokens_lemma for t in ["schedule", "book", "set up"]):
@@ -120,18 +134,31 @@ class NLUProcessor:
 
         # Simple pattern for application name after 'open'/'close'
         intent = self._recognize_intent(doc) # Re-check intent for context
+        # Improved entity extraction for application names
         if intent in ['open_application', 'close_application'] and 'object_name' not in entities:
+            trigger_lemmas = ['open', 'launch', 'start', 'close', 'quit', 'exit']
             for token in doc:
-                # Look for a noun/proper noun after 'open'/'close'/'start'/'launch'/'quit'/'exit'
-                if token.lemma_ in ['open', 'launch', 'start', 'close', 'quit', 'exit'] and token.i + 1 < len(doc):
-                    next_token = doc[token.i + 1]
-                    # Check if it's a likely app name (Noun, Proper Noun, maybe capitalized)
-                    if next_token.pos_ in ['NOUN', 'PROPN'] or next_token.is_title:
-                        entities['object_name'] = next_token.text
-                        # Potentially grab compound names like 'Visual Studio'
-                        if next_token.i + 1 < len(doc) and doc[next_token.i + 1].pos_ in ['NOUN', 'PROPN']:
-                             entities['object_name'] += ' ' + doc[next_token.i + 1].text
-                        break # Take the first likely candidate
+                if token.lemma_ in trigger_lemmas and token.i + 1 < len(doc):
+                    # Capture the text following the trigger word
+                    potential_name_parts = []
+                    for j in range(token.i + 1, len(doc)):
+                        next_token = doc[j]
+                        # Stop if we hit punctuation or another verb perhaps?
+                        if next_token.is_punct or next_token.pos_ == 'VERB':
+                            break
+                        potential_name_parts.append(next_token.text)
+                        # Simple heuristic: stop after a few words or if it doesn't look like a name
+                        if len(potential_name_parts) > 3:
+                             break
+                    if potential_name_parts:
+                        extracted_name = ' '.join(potential_name_parts)
+                        # Ensure 'object_name' is initialized as a list if it doesn't exist
+                        if 'object_name' not in entities:
+                            entities['object_name'] = []
+                        # Append the extracted name to the list
+                        entities['object_name'].append(extracted_name)
+                        # No direct string assignment needed, always use the list
+                        break # Found a potential name after the first trigger word
 
         # Extract potential search query for 'search_web'
         if intent == 'search_web':
@@ -147,8 +174,13 @@ class NLUProcessor:
             # Extract text after the keyword and optional preposition
             if start_index != -1:
                 current_index = start_index + 1
+                # Skip optional preposition
                 if current_index < len(doc) and doc[current_index].lemma_ in prepositions:
-                    current_index += 1 # Skip preposition
+                    current_index += 1
+                # Skip common filler words immediately after keyword/preposition
+                skippable_lemmas = {'me', 'us', 'some', 'any', 'a', 'an', 'the'} # Add more if needed
+                while current_index < len(doc) and doc[current_index].lemma_ in skippable_lemmas:
+                    current_index += 1
                 # Take the rest of the sentence as the query
                 query_parts = [token.text for token in doc[current_index:]]
             if query_parts:
