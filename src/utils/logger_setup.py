@@ -22,14 +22,29 @@ def setup_logging(log_config):
     if log_dir and not os.path.exists(log_dir):
         os.makedirs(log_dir)
 
-    # Basic configuration
-    logging.basicConfig(
-        level=getattr(logging, log_level, logging.INFO),
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(log_file, encoding='utf-8'),
-            logging.StreamHandler() # Also log to console
-        ]
-    )
+    # Get the root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(getattr(logging, log_level, logging.INFO))
+
+    # Create formatter
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+    # Clear existing handlers (optional, but good practice to avoid duplicates)
+    if root_logger.hasHandlers():
+        root_logger.handlers.clear()
+
+    # Create and add console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    root_logger.addHandler(console_handler)
+
+    # Create and add file handler (re-enable if needed, ensure path is correct)
+    # try:
+    #     file_handler = logging.FileHandler(log_file, encoding='utf-8')
+    #     file_handler.setFormatter(formatter)
+    #     root_logger.addHandler(file_handler)
+    # except Exception as e:
+    #     print(f"Error setting up file handler for {log_file}: {e}") # Print directly as logging might not be fully up
+    #     logging.error(f"Failed to set up file handler: {e}", exc_info=True) # Also log if possible
 
     logging.info(f"Logging configured. Level: {log_level}, File: {log_file}")

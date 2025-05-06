@@ -5,13 +5,25 @@ llm:
   model_path: "C:/Users/pwal9/Documents/assistant/models/Mistral-7B-Instruct-v0.3.Q4_K_M.gguf" # IMPORTANT: Replace with the actual path to your GGUF model
   n_gpu_layers: -1 # Number of layers to offload to GPU (-1 for all)
   n_ctx: 2048 # Context window size
-  temperature: 0.7
+  temperature: 0.6 # Adjusted temperature for potentially more focused output
   max_tokens: 512
   fp16: true # Use FP16/mixed precision
 
 # NLU Configuration
 nlu:
   spacy_model: "en_core_web_sm" # Example spaCy model
+  actionable_intents: # List of intents that should trigger task execution directly
+    - schedule_meeting
+    - send_email
+    - send_message
+    - open_application
+    - close_application # Assuming this might be added later
+    - search_web
+    - set_reminder # Assuming this might be added later
+    - schedule_event # Assuming this might be added later
+    - get_current_datetime
+    - run_whois
+    - run_nmap
 
 # Memory Configuration
 memory:

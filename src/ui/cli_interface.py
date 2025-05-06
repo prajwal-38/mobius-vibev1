@@ -16,6 +16,7 @@ Outputs:
 """
 
 import logging
+from tts.tts_service import speak_text # Added import
 
 class CommandLineInterface:
     def __init__(self, llm_interface, nlu_processor, memory_manager, task_executor):
@@ -49,7 +50,8 @@ class CommandLineInterface:
                 # long_term_info = self.memory.retrieve_long_term(...) # Example
 
                 # 3. Generate Prompt for LLM (incorporating context/memory)
-                prompt_parts = []
+                system_prompt = "You are RAGnarok, a helpful AI designed to answer questions and act as a concise personal cybersecurity assistant. You are trained of deepseek ai model. Respond directly to the user's last message, considering the conversation history.Useful for answering general questions about cybersecurity concepts, threats, vulnerabilities, and best practices based on stored documents. Input should be the question itself."
+                prompt_parts = [system_prompt] # Start with the system prompt
                 for turn in context:
                     prompt_parts.append(f"User: {turn['user']}")
                     prompt_parts.append(f"Assistant: {turn['assistant']}")
@@ -64,7 +66,8 @@ class CommandLineInterface:
                 actionable_intents = [
                     'schedule_meeting', 'send_email', 'send_message', 
                     'open_application', 'close_application', 'search_web', 
-                    'set_reminder', 'schedule_event', 'get_current_datetime' # Added date/time intent
+                    'set_reminder', 'schedule_event', 'get_current_datetime', # Added date/time intent
+                    'run_whois', 'run_nmap' # Added whois and nmap intents
                 ]
                 logging.debug(f"Checking intent '{intent}' against actionable intents: {actionable_intents}")
                 
@@ -83,19 +86,69 @@ class CommandLineInterface:
                 # If no specific task was executed (or intent was unknown/not actionable), generate a response using LLM
                 logging.debug(f"Task executed flag: {task_executed}. Intent was: '{intent}'.")
                 if not task_executed:
-                    logging.info(f"Intent '{intent}' not actionable or task not executed. Generating LLM response.")
-                    # Generate LLM Response (streaming)
+                    logging.info(f"Intent '{intent}' not actionable or task not executed. Generating LLM response and speaking concurrently.")
+                    # Generate LLM Response (streaming) and speak sentence by sentence
                     print("Assistant: ", end="", flush=True)
                     full_response = ""
+                    current_sentence = ""
+                    sentence_ends = {'.', '!', '?'}
+
                     for token in self.llm.generate(prompt):
-                        print(token, end="", flush=True)
+                        print(token, end="", flush=True) # Still print token immediately
                         full_response += token
+                        current_sentence += token
+
+                        # Check if the token ends a sentence (simple check)
+                        # Consider more robust sentence boundary detection if needed
+                        if token.strip() and token.strip()[-1] in sentence_ends:
+                            # Speak the completed sentence
+                            sentence_to_speak = current_sentence.strip()
+                            if sentence_to_speak:
+                                try:
+                                    # Use the existing synchronous wrapper which handles the async call
+                                    logging.info(f"CLI: Attempting to speak sentence: '{sentence_to_speak[:30]}...' ") # ADDED LOGGING
+                                    speak_text(sentence_to_speak)
+                                    logging.info(f"CLI: Finished speaking sentence: '{sentence_to_speak[:30]}...' ") # ADDED LOGGING
+                                except Exception as tts_e:
+                                    logging.error(f"TTS Error during sentence playback: {tts_e}", exc_info=True)
+                                    print("\n(TTS failed for sentence)") # Indicate failure
+                            current_sentence = "" # Reset for the next sentence
+
+                    # Speak any remaining part after the loop finishes
+                    final_sentence_part = current_sentence.strip()
+                    if final_sentence_part:
+                        try:
+                            logging.info(f"CLI: Attempting to speak final part: '{final_sentence_part[:30]}...' ") # ADDED LOGGING
+                            speak_text(final_sentence_part)
+                            logging.info(f"CLI: Finished speaking final part: '{final_sentence_part[:30]}...' ") # ADDED LOGGING
+                        except Exception as tts_e:
+                            logging.error(f"TTS Error for final sentence part: {tts_e}", exc_info=True)
+                            print("\n(TTS failed for final part)")
+
                     print() # Add a newline after the streaming is complete
-                    final_response = full_response # Store the complete response
+                    final_response = full_response # Store the complete response for memory
                     logging.info(f"LLM Response (full): {final_response[:100]}...")
                 else:
                     # If a task was executed, print its result normally
                     print(f"Assistant: {final_response}")
+                    # Speak the task result as well
+                    if final_response:
+                        try:
+                            logging.info(f"CLI: Attempting to speak task result: '{str(final_response)[:30]}...' ") # ADDED LOGGING
+                            speak_text(final_response)
+                            logging.info(f"CLI: Finished speaking task result: '{str(final_response)[:30]}...' ") # ADDED LOGGING
+                        except Exception as tts_e:
+                            logging.error(f"TTS Error for task result: {tts_e}", exc_info=True)
+                            print("(TTS failed to play task response)")
+
+                # Remove the original speak_text call here as it's handled above
+                # if final_response:
+                #     try:
+                #         speak_text(final_response)
+                #     except Exception as tts_e:
+                #         logging.error(f"TTS Error: {tts_e}", exc_info=True)
+                #         # Optionally inform the user TTS failed, but continue
+                #         print("(TTS failed to play response)")
 
                 # 6. Update Memory
                 # Use the final response that was generated/executed

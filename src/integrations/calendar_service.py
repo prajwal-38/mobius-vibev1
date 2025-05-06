@@ -1,8 +1,3 @@
-# src/integrations/calendar_service.py
-"""
-Handles interactions with calendar services (e.g., Google Calendar).
-"""
-
 import logging
 import os.path
 import datetime
@@ -13,16 +8,15 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-# If modifying these scopes, delete the file token.json.
+
 SCOPES = ['https://www.googleapis.com/auth/calendar.events']
 
 class CalendarService:
     def __init__(self, config):
         self.config = config
-        # Example: Initialize Google Calendar API client
-        # self.api_key = config.get('google_calendar') # API Key might not be needed if using OAuth
-        self.credentials_path = config.get('google_credentials_path', 'credentials.json') # Path to OAuth client secrets file
-        self.token_path = config.get('google_token_path', 'token.json') # Path where token is stored
+        
+        self.credentials_path = config.get('google_credentials_path', 'credentials.json') 
+        self.token_path = config.get('google_token_path', 'token.json') 
         self.credentials = self._load_credentials()
         if self.credentials:
             try:
@@ -36,16 +30,16 @@ class CalendarService:
             logging.warning("Calendar Service initialized without valid credentials.")
 
     def _load_credentials(self):
-        """Loads or refreshes Google OAuth 2.0 credentials."""
+        
         creds = None
-        # The file token.json stores the user's access and refresh tokens, and is
-        # created automatically when the authorization flow completes for the first time.
+        
+        
         if os.path.exists(self.token_path):
             try:
                 creds = Credentials.from_authorized_user_file(self.token_path, SCOPES)
             except Exception as e:
                 logging.error(f"Error loading credentials from {self.token_path}: {e}")
-        # If there are no (valid) credentials available, let the user log in.
+        
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
                 try:
@@ -53,24 +47,24 @@ class CalendarService:
                     creds.refresh(Request())
                 except Exception as e:
                     logging.error(f"Failed to refresh credentials: {e}", exc_info=True)
-                    # Indicate failure, might need re-authentication
-                    creds = None # Reset creds to trigger re-auth if possible
-                    # Optionally delete token.json here if refresh fails persistently
-                    # if os.path.exists(self.token_path):
-                    #     os.remove(self.token_path)
+                    
+                    creds = None 
+                    
+                    
+                    
             else:
-                # Run the OAuth 2.0 flow
+                
                 if not os.path.exists(self.credentials_path):
                     logging.error(f"Credentials file not found at {self.credentials_path}. Cannot initiate OAuth flow.")
                     logging.error("Please download your OAuth 2.0 Client secrets file from Google Cloud Console and save it as 'credentials.json' (or configure path in config.yaml).")
                     return None
                 try:
                     logging.info(f"Initiating Google OAuth flow using {self.credentials_path}.")
-                    # IMPORTANT: This flow requires user interaction in a browser.
-                    # In a non-interactive environment, consider a Service Account.
+                    
+                    
                     flow = InstalledAppFlow.from_client_secrets_file(self.credentials_path, SCOPES)
-                    # You might need to adjust the redirect_uri depending on your setup
-                    # For CLI, localhost is common. For web apps, it's different.
+                    
+                    
                     creds = flow.run_local_server(port=0)
                     logging.info("OAuth flow completed successfully.")
                 except FileNotFoundError:
@@ -79,7 +73,7 @@ class CalendarService:
                 except Exception as e:
                     logging.error(f"Error during OAuth flow: {e}", exc_info=True)
                     return None
-            # Save the credentials for the next run
+            
             if creds:
                 try:
                     with open(self.token_path, 'w') as token:
@@ -95,30 +89,18 @@ class CalendarService:
         return creds
 
     def schedule_event(self, summary, start_datetime, end_datetime=None, attendees=None, description=None):
-        """Schedules an event in the calendar.
-
-        Args:
-            summary (str): The title/summary of the event.
-            start_datetime (str): ISO 8601 format start time (e.g., '2024-07-28T10:00:00-07:00').
-            end_datetime (str): ISO 8601 format end time. If None, might default to a standard duration.
-            attendees (list[str]): List of attendee email addresses.
-            description (str): Optional description for the event.
-
-        Returns:
-            bool: True if successful, False otherwise.
-            str: Status message.
-        """
+        
         if not self.service or not self.credentials or not self.credentials.valid:
             logging.error("Cannot schedule event: Google Calendar service is not available or credentials are invalid.")
             return False, "Error: Calendar service not configured or authentication failed."
 
-        # Basic validation/conversion (NLU should provide structured data)
-        # This is a VERY basic placeholder for date/time parsing.
-        # A robust solution needs proper NLP date/time parsing (e.g., using spaCy, duckling)
-        # to convert natural language like "tomorrow at 2pm" into ISO 8601 format.
-        # For now, we assume start_datetime and end_datetime are already in ISO format if provided.
+        
+        
+        
+        
+        
         if not end_datetime:
-            # Example: Default to 1 hour duration if end time is missing
+            
             try:
                 start_dt_obj = datetime.datetime.fromisoformat(start_datetime)
                 end_dt_obj = start_dt_obj + datetime.timedelta(hours=1)
@@ -132,20 +114,21 @@ class CalendarService:
             'description': description,
             'start': {
                 'dateTime': start_datetime,
-                # 'timeZone': 'America/Los_Angeles', # Consider making timezone configurable or detecting it
+                
             },
             'end': {
                 'dateTime': end_datetime,
-                # 'timeZone': 'America/Los_Angeles',
+                
             },
             'attendees': [{'email': email} for email in attendees] if attendees else [],
-            # 'reminders': { # Optional: Add reminders
-            #     'useDefault': False,
-            #     'overrides': [
-            #         {'method': 'email', 'minutes': 24 * 60},
-            #         {'method': 'popup', 'minutes': 10},
-            #     ],
-            # },
+            
+            
+            
+            
+            
+            
+            
+            
         }
 
         try:
@@ -161,11 +144,11 @@ class CalendarService:
             logging.error(f"Failed to schedule event '{summary}': {e}", exc_info=True)
             return False, f"Failed to schedule event: {e}"
 
-# Example usage (for testing):
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    # Dummy config for testing - Requires credentials.json and token.json handling
-    # Point to where your credentials.json is located
+    
+    
     dummy_config = {
         'google_credentials_path': 'credentials.json',
         'google_token_path': 'token.json'

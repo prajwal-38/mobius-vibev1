@@ -1,7 +1,4 @@
-# src/integrations/email_service.py
-"""
-Handles sending emails via SMTP or API.
-"""
+
 
 import logging
 import smtplib
@@ -10,13 +7,12 @@ from email.mime.text import MIMEText
 class EmailService:
     def __init__(self, config):
         self.config = config
-        # Example: Load SMTP settings from config
-        # Load SMTP settings from config - User needs to configure these!
+        
         self.smtp_server = config.get('smtp_server')
-        self.smtp_port = config.get('smtp_port', 587) # Default to 587 (TLS)
+        self.smtp_port = config.get('smtp_port', 587) 
         self.smtp_user = config.get('smtp_user')
-        self.smtp_password = config.get('smtp_password') # IMPORTANT: Use secure storage (e.g., env vars, secrets manager)
-        self.sender_email = config.get('sender_email', self.smtp_user) # Use smtp_user as sender if not specified
+        self.smtp_password = config.get('smtp_password') 
+        self.sender_email = config.get('sender_email', self.smtp_user) 
 
         if not all([self.smtp_server, self.smtp_port, self.smtp_user, self.smtp_password, self.sender_email]):
             logging.warning("Email Service is not fully configured. Please provide smtp_server, smtp_port, smtp_user, smtp_password, and sender_email in config.")
@@ -26,17 +22,7 @@ class EmailService:
             logging.info("Email Service initialized with SMTP configuration.")
 
     def send_email(self, recipient, subject, body):
-        """Sends an email.
-
-        Args:
-            recipient (str): The email address of the recipient.
-            subject (str): The subject of the email.
-            body (str): The body content of the email.
-
-        Returns:
-            bool: True if successful, False otherwise.
-            str: Status message.
-        """
+        
         if not self.configured:
             logging.error("Cannot send email: Email Service is not configured.")
             return False, "Error: Email service not configured. Please check SMTP settings."
@@ -48,13 +34,13 @@ class EmailService:
 
         try:
             logging.info(f"Attempting to send email via {self.smtp_server}:{self.smtp_port} from {self.sender_email} to {recipient}")
-            # Connect to SMTP server (TLS is common)
-            # Use SMTP_SSL for port 465, or SMTP with starttls() for port 587
+            
+            
             if self.smtp_port == 465:
                  server = smtplib.SMTP_SSL(self.smtp_server, self.smtp_port)
-            else: # Assume port 587 or other requires STARTTLS
+            else: 
                  server = smtplib.SMTP(self.smtp_server, self.smtp_port)
-                 server.starttls() # Secure the connection
+                 server.starttls() 
 
             server.login(self.smtp_user, self.smtp_password)
             server.sendmail(self.sender_email, [recipient], msg.as_string())
@@ -74,16 +60,16 @@ class EmailService:
             logging.error(f"Failed to send email to {recipient}: {e}", exc_info=True)
             return False, f"Failed to send email due to an unexpected error: {e}"
 
-# Example usage (for testing):
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    # Dummy config for testing - Replace with your actual SMTP details
-    # Ensure these are added to your config.yaml or loaded securely
+    
+    
     dummy_config = {
-        'smtp_server': 'smtp.gmail.com', # Example: Gmail SMTP
-        'smtp_port': 587, # Example: Gmail TLS port
-        'smtp_user': 'your_email@gmail.com', # Your email
-        'smtp_password': 'your_app_password', # Your Gmail App Password
+        'smtp_server': 'smtp.gmail.com', 
+        'smtp_port': 587, 
+        'smtp_user': 'your_email@gmail.com', 
+        'smtp_password': 'your_app_password', 
         'sender_email': 'your_email@gmail.com'
     }
     email_service = EmailService(dummy_config)
